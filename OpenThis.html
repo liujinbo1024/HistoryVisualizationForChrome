@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+<link href="css/css.css" rel="stylesheet" type="text/css" />
+<link href="css/buttons.css" rel="stylesheet" type="text/css" />
+  <script src=js/d3.js></script>
+  <script src=js/pie.js></script>
+  <script src=js/tiaoxingtu.js></script>
+  <script src=js/GetType.js></script>
+  <script src=js/RadarChart.js></script>
+  <script src=js/Sunburst.js></script>
+</head>
+<style>
+</style>
+<body>
+<p id="Headline">History Visualization For Chrome</p>
+  <div id="main">
+  		 
+       <div id="mainsvg">      		
+       		<svg id="Piesvg"></svg>  
+       </div>
+			 <div id="RadarChart"></div>
+			 <div id = "zzchart"></div>
+
+      <div id="row-filter">
+          <svg id="svg-filter"></svg>   
+      </div>
+  
+   <button class="button button-royal button-pill button-giant" id="Analysis" onclick="openwin()"">Analysis</button>
+
+  </div>
+
+  <script>
+
+     function openwin() {  
+        window.open("test2.html", "", "width=1000,height=520")  
+    }  
+
+    d3.json("history.json",function(error,data){
+                data.sort(comparex);
+                //console.log(data);
+
+//-----------------------------------------------------------------
+        var Timedatax=new Array;
+        Timedatax[0]=new Object();
+       
+        var temp = data[0].lastVisitTime.split("/");
+
+         Timedatax[0].date=timeFormatSet(new Date(temp[0],temp[1]-1,temp[2]));
+         Timedatax[0].mounts=0;
+
+        //console.log(Timedatax[0]);
+//-----------------------------------------------------------------
+
+    for (var i=0;i<data.length;i++)
+    {
+        var str = data[i].url;
+
+        if (str.search("http://")==-1 && str.search("https://")==-1)
+        {
+            for (var j=str.length-1;j>=0;j--)
+            {
+              if (str[j]=='/' && str[j+1]=='/')
+              {
+                   data[i].url=str.substring(j,str.length);
+              }
+            }
+        }
+        else {
+          var front = str.search("http://");
+          if (front==-1)
+          {
+            front = str.search("https://")+8;
+          }
+          else front+=7;
+
+          if (front==-1)
+            { 
+              data.splice(i,1);
+              continue;
+            }
+
+          var back;
+          for (var j=12;j<str.length;j++)
+          {
+            if (str[j]=='/')
+                {
+                  back=j;
+                  break;
+                }
+          }
+
+          if (front!=-1 && back!=-1)
+          {
+            data[i].url=str.substring(front,back);
+            if (data[i].url.search("www.")!=-1)
+            {
+             // console.log(data[i].url);
+              data[i].url=data[i].url.substring(4,data[i].url.length);
+            }
+          }
+      }
+
+//统计每日------------------------------------------------------------------------------
+        var temp = data[i].lastVisitTime.split("/");
+
+        var week=timeFormatSet(new Date(temp[0],temp[1]-1,temp[2]));
+
+        if (Timedatax[Timedatax.length-1].date==week)
+        {
+            Timedatax[Timedatax.length-1].mounts+=data[i].visitCount;
+        }
+        else
+        {
+            var x=Timedatax.length;
+            Timedatax[x]=new Object();
+            Timedatax[x].date=week;
+            Timedatax[x].mounts=0;
+        }
+   }
+   console.log(Timedatax);
+
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+//console.log(Sorts);
+var datax=GetRadarData(data);
+var value = (datax[0].map(function(i, j){return i.value}));
+
+ var config = {
+    w: 300,
+    h: 300,
+    maxValue:d3.max(value,function(d){
+      return d;
+    }),
+    levels: 5,
+    ExtraWidthX: 300
+}
+
+     // console.log(datax);
+      RadarChart.draw("#RadarChart", datax, config);
+      piecharts(data,10);
+      //tiaoxingtu(data);
+      
+      d3.json("newdata.json", function(error, root) {
+ 				if (error) throw error;
+ 				sunburst(root);
+ 			});
+
+      
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+//------------------draw----------------------------------------------------
+
+
+
+//-时间轴---------------------------------------------------------------------------------
+//-时间轴---------------------------------------------------------------------------------
+//-时间轴---------------------------------------------------------------------------------
+//console.log(Timedatax);
+for (var i=0;i<Timedatax.length;i++)
+{
+  Timedatax[i].mounts=Number(Timedatax[i].mounts);
+  Timedatax[i].date=new Date(Timedatax[i].date.split("/"));
+}
+
+  //console.log(Timedatax[Timedatax.length-1]);
+  var svgFilter = d3.select("#svg-filter");
+
+  // slider
+  var sliderHeight=70;
+  var sliderWidth = 1450;
+  var sliderMargin = {  
+    "top" : 70,
+    "bottom" : 100,
+    "left" : 30,
+    "right" : 550
+  };
+
+  var timefo=d3.timeFormat("%Y/%m/%d");
+
+  var b=Timedatax[0].date;
+  var e=Timedatax[Timedatax.length-1].date;
+
+
+  var xYearFirst = d3.scaleTime()
+        .domain([b, e])
+        .range([0, sliderWidth])
+          .clamp(true);
+
+  var  x2 = d3.scaleTime().range([0, sliderWidth]);
+
+  var sliderYearFirst = svgFilter.append("g")
+      .attr("class", "slider")
+      .attr("transform", "translate(" + sliderMargin.left + "," + sliderMargin.top + ")");
+  
+  sliderYearFirst.append("line")
+      .attr("class", "track")
+      .attr("x1", xYearFirst.range()[0])
+      .attr("x2", xYearFirst.range()[1]);
+  
+ 
+  sliderYearFirst.insert("g")
+      .attr("class", "ticks")
+      .attr("transform", "translate(0," + 20 + ")")
+      .selectAll("text")
+      .data(xYearFirst.ticks(7))
+      .enter().append("text")
+      .attr("font-size", "10px")
+      .attr("x", xYearFirst)
+      .attr("text-anchor", "middle")
+      .text(function(d) { return timefo(d); });
+
+
+  var context = svgFilter.append("g")
+    .attr("class", "context")
+    .attr("transform", "translate(" + 30 + "," + 10 + ")");
+
+
+//文字--------------------------------------------------------------------------
+  var xx = [sliderMargin.top-10,sliderWidth-70];
+
+  var svgFilterText = svgFilter
+      .insert("g")
+      .selectAll("text")
+      .data([0,1])
+      .enter()
+      .append("text");
+
+  var svgFilterLabels =  svgFilterText
+      .attr("x", function(d) { return xx[d]; })
+      .attr("y", sliderMargin.top+35)
+      .text( function (d) { return 0; })
+      .attr("font-family", "sans-serif")
+      .attr("font-size", "12px");
+
+  var svgFilterDesc = svgFilter
+      .insert("g")
+      .selectAll("text")
+      .data([2])
+      .enter()
+      .append("text");
+
+
+//刷子----------------------------------------------------------------------------
+
+var Yheight=70;
+var x = d3.scaleTime().range([0, sliderWidth]),
+    x2 = d3.scaleTime().range([0, sliderWidth]),
+    y = d3.scaleLinear().range([Yheight, 0]),
+    y2 = d3.scaleLinear().range([Yheight, 0]);
+
+var area2 = d3.area()
+    .curve(d3.curveMonotoneX)
+    .x(function(d) { return x2(d.date); })
+    .y0(Yheight)
+    .y1(function(d) { return y2(d.mounts); });
+
+
+  x2.domain(d3.extent(Timedatax, function(d) { return d.date; }));
+  y2.domain([0, d3.max(Timedatax, function(d) { return d.mounts; })]);
+
+
+var brush = d3.brushX()
+    .extent([[0, 0], [sliderWidth, sliderHeight]])
+    .on("brush", function(){
+     updateFilterText();
+    })
+    .on("end", function(){
+
+      Refresh(getRangeText(),data);
+
+    });
+
+context.append("path")
+      .attr("class", "area")
+      .attr("d", area2(Timedatax))
+      .attr("transform", "translate(0," + 0 + ")");
+
+  context.append("g")
+      .attr("class", "brush")
+      .call(brush)
+      .call(brush.move, x.range())
+      .attr("transform", "translate(0," + 0 + ")");
+
+
+      var handle1 = context.select(".brush").select(".handle--w");
+      var handle2 = context.select(".brush").select(".handle--e");
+
+  function brushed() {
+
+  var s = d3.event.selection || x2.range();
+  x.domain(s.map(x2.invert, x2));
+
+}
+
+  function getRangeText() {
+      var handle1 = context.select(".brush").select(".handle--w");
+     
+
+      var handle2 = context.select(".brush").select(".handle--e");
+
+/*       console.log(Number(handle1.attr("x"))+3);
+        console.log(Number(handle2.attr("x"))+3);*/
+
+    var valA = xYearFirst.invert(Number(handle1.attr("x"))+3);
+    var valB = xYearFirst.invert(Number(handle2.attr("x"))+3);
+
+    //console.log(timefo(valA),timefo(valB));
+
+    return [timefo(valA),timefo(valB)];
+  }
+
+  function updateFilterText() {
+    var Timedataxx = getRangeText();
+    //console.log(Timedatax);
+    var valA = +Timedataxx[0];
+    var valB = +Timedataxx[1]
+    redrawLabel(Timedataxx);
+  }
+
+  function redrawLabel(curVal) {
+
+    //console.log(svgFilterText);
+
+    svgFilterLabels
+      .text(function(d) { return curVal[d]; })
+  }
+
+//-时间轴---------------------------------------------------------------------------------
+//-时间轴---------------------------------------------------------------------------------
+//-时间轴--------------------------------------------------------------------------------- 
+});
+
+
+//刷新------------------------------------------------------------------------------------
+
+        function Refresh(DataRange,data){
+
+           var x= data.slice(0,data.length);
+           var newdata;
+
+           newdata=RefreshData(DataRange,x);
+
+         /*  console.log(DataRange);
+           console.log(newdata);*/
+
+           piecharts(newdata,10);
+           //tiaoxingtu(newdata);
+
+
+           var datax=GetRadarData(newdata);
+
+
+            var value = (datax[0].map(function(i, j){return i.value}));
+            var config = {
+                  w: 300,
+                  h: 300,
+                  maxValue:d3.max(value,function(d){
+                    return d;
+                  }),
+                  levels: 5,
+                  ExtraWidthX: 300
+              }
+           RadarChart.draw("#RadarChart", datax, config);
+
+           }
+
+ function RefreshData(DataRangex,originalData)
+        {
+
+          var DataRange_start = DataRangex[0].split("/");
+
+          var DataRange_end = DataRangex[1].split("/");
+
+/*           console.log(originalData);
+           console.log(data);*/
+            var x1=0;
+            var x2=0;
+
+            for(var i=0;i<originalData.length;i++)
+            {
+
+              var temp=originalData[i].lastVisitTime.split("/");
+              if (timeFormatSet(new Date(DataRange_start[0],DataRange_start[1],DataRange_start[2]))<=timeFormatSet(new Date(temp[0],temp[1],temp[2])))
+              {
+                  x1=i;
+/*                  console.log(DataRange_start);
+                  console.log(originalData[i]);
+                  console.log(x1);*/
+                  break;
+              }
+            }
+
+           for(var i=0;i<originalData.length;i++)
+            {
+
+              var temp=originalData[i].lastVisitTime.split("/");
+                if (timeFormatSet(new Date(DataRange_end[0],DataRange_end[1],DataRange_end[2]))<timeFormatSet(new Date(temp[0],temp[1],temp[2])))
+              {
+                  x2=i; 
+/*                  console.log(DataRange_end);
+                  console.log(originalData[i]);
+                  console.log(originalData[i+1]);
+                  console.log(i);*/
+                  break;
+              }
+            }
+            if (x2==0)
+              x2=originalData.length;
+
+         //   console.log(x1,x2);
+           return originalData.slice(x1,x2);
+
+}
+function GetRadarData(data)
+{
+     var Sorts=new Array;
+
+         Sorts["Entertainment"]=new Object;
+         Sorts["Society"]=new Object;
+         Sorts["Shopping"]=new Object;
+         Sorts["Search"]=new Object;
+         Sorts["News"]=new Object;
+         Sorts["Education"]=new Object;
+         Sorts["undefined"]=new Object;
+
+         Sorts["Entertainment"].times=0;
+         Sorts["Society"].times=0;
+         Sorts["Shopping"].times=0;
+         Sorts["Search"].times=0;
+         Sorts["News"].times=0;
+         Sorts["Education"].times=0;
+         Sorts["undefined"].times=0;
+
+         Sorts["Entertainment"].content=new Array;
+         Sorts["Society"].content=new Array;
+         Sorts["Shopping"].content=new Array;
+         Sorts["Search"].content=new Array;
+         Sorts["News"].content=new Array;
+         Sorts["Education"].content=new Array;
+         Sorts["undefined"].content=new Array;
+
+         var times=new Array;
+           for (var i=0;i<Typedata.length;i++)
+          {
+            times[Typedata[i].Name] = new Object;
+            times[Typedata[i].Name].type=Typedata[i].Type;
+            times[Typedata[i].Name].ifexist=0;
+          }
+
+           for (var i=0;i<data.length;i++)
+          {
+
+        //分类--------------------------------------------------------------------------
+                //console.log(Sorts);
+                if (times[data[i].url]!=undefined)
+                {
+
+                    var x=times[data[i].url].type;
+                    Sorts[x].times++; 
+                }
+                else 
+                {
+                    times[data[i].url] = new Object;
+                    times[data[i].url].type="undefined";
+                    times[data[i].url].ifexist=0;
+                }
+                 if (times[data[i].url].ifexist==0 &&  Sorts[x]!=undefined){
+
+                    Sorts[x].content.push(data[i].url);
+                    times[data[i].url].ifexist=1;
+                   }
+          }
+
+           var datax=[];
+            datax[0]=new Array;
+
+            for(var i=0;i<6;i++)
+              datax[0][i] = new Object;
+
+            datax[0][0].area="Education";
+            datax[0][1].area="Entertainment";
+            datax[0][2].area="News";
+            datax[0][3].area="Search";
+            datax[0][4].area="Shopping";
+            datax[0][5].area="Society";
+
+            datax[0][0].value=Sorts["Education"].times ;
+            datax[0][1].value=Sorts["Entertainment"].times;
+            datax[0][2].value=Sorts["News"].times;
+            datax[0][3].value=Sorts["Search"].times;
+            datax[0][4].value=Sorts["Shopping"].times;
+            datax[0][5].value=Sorts["Society"].times;
+						
+						//console.log(datax[0][1].value);
+						//对数据取对数
+						for (var i = 0; i < 6; i++){
+							datax[0][i].value =parseInt(Math.log(datax[0][i].value));
+						}						
+            return datax;
+
+    }
+
+         var timeFormatSet=d3.timeFormat("%Y/%m/%d");
+         var comparex = function (obj1, obj2) 
+                  {
+                    var time1=obj1.lastVisitTime.split("/");
+                    var val1=timeFormatSet( new Date(Number(time1[0]),Number(time1[1])-1,Number(time1[2]) ) );
+
+                    var time2=obj2.lastVisitTime.split("/");
+                    var val2=timeFormatSet( new Date(Number(time2[0]),Number(time2[1])-1,Number(time2[2])) );
+                    
+                          if (val1 < val2) {
+                              return -1;
+                          } else if (val1 > val2) {
+                             
+                              return 1;
+                          } else {
+                              return 0;
+                          }
+                   }            
+ 
+
+  </script>
+
+
+</body>
+</html>
